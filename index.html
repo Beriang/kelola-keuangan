@@ -784,7 +784,7 @@
                         let totalGained = 0;
 
                         for (let i = 0; i < daysDiff; i++) {
-                            const gain = currBalance * (yieldRate / 100);
+                            const dailyRate = (yieldRate / 100) / 365;
                             totalGained += gain;
                             currBalance += gain;
                         }
@@ -799,7 +799,7 @@
                             amount: totalGained,
                             accountId: acc.id,
                             categoryId: state.categories.find(c => c.type === 'income')?.id || '',
-                            description: `Imbal Hasil Harian ${yieldRate}% (${daysDiff} hari)`
+                            description: `Imbal Hasil Tahunan ${yieldRate}% (${daysDiff} hari)`
                         });
 
                         updated = true;
@@ -815,7 +815,7 @@
 
             if (updated) {
                 saveState();
-                notify('Saldo bank telah otomatis bertambah dari imbal hasil harian!', 'success');
+                notify('Saldo bank telah otomatis bertambah dari imbal hasil tahunan!', 'success');
             }
         }
 
