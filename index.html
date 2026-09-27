@@ -63,7 +63,7 @@
         <aside class="w-full md:w-64 bg-slate-900 text-slate-300 p-5 hidden md:flex md:flex-col justify-between border-r border-slate-800">
             <div>
                 <!-- Logo -->
-                <div class="flex items-center gap-3 text-white mb-8 px-2">
+                <div class="flex items-center gap-3 text-white mb-6 px-2">
                     <div class="w-10 h-10 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
                         <i class="fa-solid fa-wallet text-xl"></i>
                     </div>
@@ -73,8 +73,19 @@
                     </div>
                 </div>
 
+                <!-- Google Sheets Sync Status Button -->
+                <div class="mb-6 px-2">
+                    <button onclick="openSheetsModal()" id="syncBadgeDesktop" class="w-full flex items-center justify-between px-3 py-2 bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-700 transition">
+                        <span class="flex items-center gap-2">
+                            <span id="syncDotDesktop" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                            <span id="syncTextDesktop">Mode Offline</span>
+                        </span>
+                        <i class="fa-solid fa-cloud text-slate-400"></i>
+                    </button>
+                </div>
+
                 <!-- Navigation Menu -->
-                <nav class="space-y-1.5 mt-6">
+                <nav class="space-y-1.5">
                     <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all bg-sky-600 text-white shadow-md shadow-sky-600/30">
                         <i class="fa-solid fa-chart-pie w-5 text-center"></i>
                         Dashboard
@@ -96,6 +107,10 @@
 
             <!-- Action Buttons -->
             <div class="pt-6 border-t border-slate-800 space-y-2">
+                <button onclick="fetchDataFromSheets()" class="w-full flex items-center justify-center gap-2 py-2 px-4 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-xl text-xs font-semibold transition">
+                    <i class="fa-solid fa-rotate"></i>
+                    Tarik Data dari Sheets
+                </button>
                 <button onclick="openTransferModal()" class="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-xl text-xs font-semibold transition">
                     <i class="fa-solid fa-arrow-right-arrow-left"></i>
                     Transfer Antar Rekening
@@ -116,6 +131,10 @@
                 <span class="font-bold text-base">FinansialKu</span>
             </div>
             <div class="flex items-center gap-2">
+                <button onclick="openSheetsModal()" id="syncBadgeMobile" class="text-xs bg-slate-800 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-300 font-medium">
+                    <span id="syncDotMobile" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                    <i class="fa-solid fa-cloud text-xs"></i>
+                </button>
                 <button onclick="openTransferModal()" class="text-xs bg-sky-600 px-3 py-1.5 rounded-lg flex items-center gap-1 font-medium">
                     <i class="fa-solid fa-right-left"></i>
                     Transfer
@@ -512,6 +531,33 @@
         </div>
     </div>
 
+    <!-- MODAL 5: GOOGLE SHEETS INTEGRATION -->
+    <div id="modal-sheets" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 relative">
+            <button onclick="closeModal('modal-sheets')" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+                <i class="fa-solid fa-file-excel text-emerald-600"></i> Integrasi Google Sheets
+            </h3>
+            <p class="text-xs text-slate-500 leading-relaxed mb-4">
+                Masukkan **Web App URL** dari Google Apps Script untuk mengaktifkan **Two-Way Synchronization** antara HP/PC dan Google Spreadsheet secara gratis.
+            </p>
+
+            <form onsubmit="handleSheetsUrlSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Apps Script Web App URL</label>
+                    <input type="text" id="sheets-url-input" placeholder="https://script.google.com/macros/s/.../exec" class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                </div>
+
+                <div class="pt-2 flex gap-2">
+                    <button type="button" onclick="closeModal('modal-sheets')" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-xs rounded-xl">Batal</button>
+                    <button type="submit" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-md">Simpan & Sync</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Application Logic (Pure Vanilla JS) -->
     <script>
         // Global State - Kosong jika tidak ada data di LocalStorage
@@ -519,6 +565,7 @@
             accounts: JSON.parse(localStorage.getItem('fin_accounts')) || [],
             categories: JSON.parse(localStorage.getItem('fin_categories')) || [],
             transactions: JSON.parse(localStorage.getItem('fin_transactions')) || [],
+            sheetsUrl: localStorage.getItem('fin_sheets_url') || '',
             activeTab: 'dashboard',
             txModalType: 'expense'
         };
@@ -544,12 +591,92 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
-        // Save State to LocalStorage
+        // Save State to LocalStorage & Sync to Sheets
         function saveState() {
             localStorage.setItem('fin_accounts', JSON.stringify(state.accounts));
             localStorage.setItem('fin_categories', JSON.stringify(state.categories));
             localStorage.setItem('fin_transactions', JSON.stringify(state.transactions));
+            localStorage.setItem('fin_sheets_url', state.sheetsUrl);
             renderUI();
+            pushDataToSheets();
+        }
+
+        // Sync Status Indicator
+        function updateSyncBadge(status) {
+            const dotDesk = document.getElementById('syncDotDesktop');
+            const textDesk = document.getElementById('syncTextDesktop');
+            const dotMob = document.getElementById('syncDotMobile');
+
+            if (status === 'synced') {
+                dotDesk.className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+                textDesk.innerText = "Synced (Sheets Active)";
+                dotMob.className = "w-2 h-2 rounded-full bg-emerald-400";
+            } else if (status === 'syncing') {
+                dotDesk.className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse";
+                textDesk.innerText = "Menyelaraskan...";
+                dotMob.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
+            } else {
+                dotDesk.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
+                textDesk.innerText = "Mode Offline";
+                dotMob.className = "w-2 h-2 rounded-full bg-slate-400";
+            }
+        }
+
+        // Push Data to Google Sheets (Local -> Cloud)
+        async function pushDataToSheets() {
+            if (!state.sheetsUrl) {
+                updateSyncBadge('offline');
+                return;
+            }
+            updateSyncBadge('syncing');
+            try {
+                await fetch(state.sheetsUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        accounts: state.accounts,
+                        categories: state.categories,
+                        transactions: state.transactions
+                    })
+                });
+                updateSyncBadge('synced');
+            } catch (err) {
+                console.error("Error pushing to sheets:", err);
+                updateSyncBadge('offline');
+            }
+        }
+
+        // Fetch Data from Google Sheets (Cloud -> Local)
+        async function fetchDataFromSheets() {
+            if (!state.sheetsUrl) {
+                notify('Atur URL Google Apps Script terlebih dahulu', 'error');
+                openSheetsModal();
+                return;
+            }
+            updateSyncBadge('syncing');
+            try {
+                const res = await fetch(state.sheetsUrl);
+                const cloudData = await res.json();
+                
+                if (cloudData && cloudData.accounts) {
+                    state.accounts = cloudData.accounts || [];
+                    state.categories = cloudData.categories || [];
+                    state.transactions = cloudData.transactions || [];
+                    
+                    localStorage.setItem('fin_accounts', JSON.stringify(state.accounts));
+                    localStorage.setItem('fin_categories', JSON.stringify(state.categories));
+                    localStorage.setItem('fin_transactions', JSON.stringify(state.transactions));
+                    
+                    renderUI();
+                    updateSyncBadge('synced');
+                    notify('Data berhasil diselaraskan dari Google Sheets!');
+                }
+            } catch (err) {
+                console.error("Error fetching from sheets:", err);
+                updateSyncBadge('offline');
+                notify('Gagal mengambil data dari Google Sheets', 'error');
+            }
         }
 
         // Switch Tabs
@@ -644,7 +771,7 @@
             const recent = state.transactions.slice(0, 5);
 
             if (recent.length === 0) {
-                list.innerHTML = `<div class="text-center py-6 text-slate-400 text-sm">Belum ada transaksi recorded.</div>`;
+                list.innerHTML = `<div class="text-center py-6 text-slate-400 text-sm">Belum ada transaksi terrekam.</div>`;
                 return;
             }
 
@@ -664,7 +791,7 @@
                             <div class="min-w-0">
                                 <p class="text-sm font-semibold text-slate-800 truncate">${tx.description}</p>
                                 <p class="text-xs text-slate-400">${tx.date} • ${
-                                    tx.type === 'transfer' ? `${acc?.name || 'Akun'} → ${targetAcc?.name || 'Tujuan'}` : `${acc?.name || 'Akun'} (${cat?.name || 'Tanpa Kategori'})`
+                                    tx.type === 'transfer' ? `${acc?.name \vert{}\vert{} 'Akun'} →${targetAcc?.name || 'Tujuan'}` : `${acc?.name \vert{}\vert{} 'Akun'} (${cat?.name || 'Tanpa Kategori'})`
                                 }</p>
                             </div>
                         </div>
@@ -724,7 +851,7 @@
                             <div class="min-w-0">
                                 <p class="text-sm font-semibold text-slate-800">${tx.description}</p>
                                 <p class="text-xs text-slate-400 mt-0.5">${tx.date} • ${
-                                    tx.type === 'transfer' ? `${account?.name || 'Akun'} → ${targetAccount?.name || 'Tujuan'}` : `${account?.name || 'Akun'} | <span class="text-sky-600">${category?.name || 'Tanpa Kategori'}</span>`
+                                    tx.type === 'transfer' ? `${account?.name \vert{}\vert{} 'Akun'} →${targetAccount?.name || 'Tujuan'}` : `${account?.name || 'Akun'} | <span class="text-sky-600">${category?.name || 'Tanpa Kategori'}</span>`
                                 }</p>
                             </div>
                         </div>
@@ -1008,6 +1135,20 @@
             notify('Kategori baru berhasil ditambahkan!');
         }
 
+        function openSheetsModal() {
+            document.getElementById('sheets-url-input').value = state.sheetsUrl;
+            document.getElementById('modal-sheets').classList.remove('hidden');
+        }
+
+        function handleSheetsUrlSubmit(e) {
+            e.preventDefault();
+            const url = document.getElementById('sheets-url-input').value.trim();
+            state.sheetsUrl = url;
+            localStorage.setItem('fin_sheets_url', url);
+            closeModal('modal-sheets');
+            fetchDataFromSheets();
+        }
+
         function deleteTx(id) {
             const tx = state.transactions.find(t => t.id === id);
             if (!tx) return;
@@ -1036,6 +1177,7 @@
                 state.accounts = [];
                 state.categories = [];
                 state.transactions = [];
+                state.sheetsUrl = '';
                 saveState();
                 notify('Seluruh data berhasil dikosongkan total!', 'error');
             }
@@ -1048,7 +1190,13 @@
         // Initialize App on Window Load
         window.onload = function() {
             renderUI();
+            if (state.sheetsUrl) {
+                fetchDataFromSheets();
+            } else {
+                updateSyncBadge('offline');
+            }
         };
     </script>
 </body>
 </html>
+
